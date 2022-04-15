@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Channel {
+  id           BigInt    @id
+  permissions  Json?
+  webhookId    BigInt?
+  webhookToken String?   @db.VarChar(255) /// @encrypted
+  guildId      BigInt
+  guild        Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages     Message[]
+
+}
+
+model Guild {
+  id                BigInt    @id
+  logChannelId      BigInt?
+  permissions       Json?
+  beforeMigration   Boolean   @default(false) // This indicates if the guild existed before the migration to storing message content. 
+  // If it was it gains access to adding any previous bot sent message to the database.
+  managementRoleIds BigInt[]
+  messages          Message[]
+  channels          Channel[]
+}
+
+model Message {
+  id          BigInt
+  guildId     BigInt
+  guild       Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  channelId   BigInt
+  channel     Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  content     String /// @encrypted
+  editedAt    DateTime
+  editedBy    BigInt
+  deleted     Boolean  @default(false)
+  addedByUser Boolean  @default(false) // This indicates if the message was a message previously sent by the bot, and then added to the database.
+
+
+  @@unique([id, editedAt])
+}
+
+model User {
+  id                   BigInt    @id
+  oauthToken           String? /// @encrypted
+  oauthTokenExpiration DateTime?
+  refreshToken         String? /// @encrypted
+  staff                Boolean   @default(false)
+}
+
+enum ReportStatus {
+  Pending // Not yet reviewed by a staff member
+  Open // A staff member has reviewed the report and it is still open
+  Actioned // A staff member has reviewed the report and it is closed and reported message / server has been actioned
+  Ignored // A staff member has reviewed the report and it is closed and no action has been taken
+  Spam // A staff member has reviewed the report and the report was deemed to be spam. 
+  // Three spam reports in a month perioud will result in restriction to reporting ablitity.
+}
+
+model Report {
+  id                    BigInt          @id @default(autoincrement())
+  userId                BigInt
+  content               String /// @encrypted
+  messageId             BigInt
+  guildId               BigInt
+  channelId             BigInt
+  reportedAt            DateTime
+  resolvedAt            DateTime? // Report should be resolved closed if this is set
+  status                ReportStatus    @default(Pending)
+  userReportReason      String /// @encrypted
+  staffResolvedReasonId BigInt?
+  staffResolvedReason   ReportReason?   @relation(fields: [staffResolvedReasonId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages              ReportMessage[]
+}
+
+model ReportReason {
+  // Set by staff when closing the ticket
+  id          BigInt   @id @default(autoincrement())
+  name        String
+  description String
+  reports     Report[]
+}
+
+model ReportMessage {
+  // Communication between the user and staff - doesn't include the inital report
+  id        BigInt  @id @default(autoincrement())
+  authorId  BigInt
+  fromStaff Boolean // If the author of the message was staff
+  content   String /// @encrypted
+  reportId  BigInt
+  report    Report  @relation(fields: [reportId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
