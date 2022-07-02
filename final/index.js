@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
     if (guild.managementRoleId)
       dataF.permissions = {
         roles: {
-          [guild.managementRoleId]: 4,
+          [guild.managementRoleId]: 15,
         },
       };
     if (guild.loggingChannelId)
