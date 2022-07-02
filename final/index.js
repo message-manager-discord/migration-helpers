@@ -10,6 +10,7 @@ const prisma = new PrismaClient();
         roles: {
           [guild.managementRoleId]: 15,
         },
+        users: {},
       };
     if (guild.loggingChannelId)
       dataF.logChannelId = BigInt(guild.loggingChannelId);
